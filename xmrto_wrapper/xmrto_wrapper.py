@@ -209,8 +209,7 @@ class PriceAttributesV3(PriceAttributes):
 @dataclass
 class Price:
     def _to_json(self):
-        data = {PriceAttributes.out_amount: self.out_amount}
-        return data
+        return {PriceAttributes.out_amount: self.out_amount}
 
     def __str__(self):
         return json.dumps(self._to_json())
@@ -300,8 +299,7 @@ class Parameters:
     zero_conf_enabled: bool = False
 
     def _to_json(self):
-        data = {ParametersAttributes.zero_conf_enabled: self.zero_conf_enabled}
-        return data
+        return {ParametersAttributes.zero_conf_enabled: self.zero_conf_enabled}
 
     def __str__(self):
         return json.dumps(self._to_json())
@@ -450,7 +448,7 @@ class XmrtoConnection:
             if not schema.match(
                 url
             ):  # 'match' starts at the begining of the line.
-                url = "https://" + url
+                url = f"https://{url}"
             http = re.compile("http://")
             if http.match(url):  # 'match' starts at the begining of the line.
                 url = url.replace("http", "https")
@@ -501,25 +499,19 @@ class XmrtoConnection:
                 data["verify"] = True
 
                 response = func(**data)
-        except (ConnectionError) as e:
+        except ConnectionError as e:
             logger.debug(f"Connection error: {str(e)}.")
-            error_msg = {"error": str(e)}
-            error_msg["url"] = url
-            error_msg["error_code"] = 102
+            error_msg = {"error": str(e), "url": url, "error_code": 102}
             logger.error(json.dumps(error_msg))
             return error_msg
-        except (RequestException) as e:
+        except RequestException as e:
             logger.debug(f"Request error: {str(e)}.")
-            error_msg = {"error": str(e)}
-            error_msg["url"] = url
-            error_msg["error_code"] = 104
+            error_msg = {"error": str(e), "url": url, "error_code": 104}
             logger.error(json.dumps(error_msg))
             return error_msg
-        except (Exception) as e:
+        except Exception as e:
             logger.debug(f"Error: {str(e)}.")
-            error_msg = {"error": str(e)}
-            error_msg["url"] = url
-            error_msg["error_code"] = 103
+            error_msg = {"error": str(e), "url": url, "error_code": 103}
             logger.error(json.dumps(error_msg))
             return error_msg
 
@@ -528,19 +520,19 @@ class XmrtoConnection:
             response_ = self._get_response(
                 response=response, expect_json=expect_json
             )
-        except (ValueError) as e:
+        except ValueError as e:
             logger.debug(f"Error: {str(e)}.")
-            error_msg = {"error": json.loads(str(e))}
-            error_msg["url"] = url
-            error_msg["error_code"] = 100
+            error_msg = {"error": json.loads(str(e)), "url": url, "error_code": 100}
             logger.error(f"Response error: {json.dumps(error_msg)}.")
             return error_msg
 
         if not response_:
             if expect_response:
-                error_msg = {"error": "Could not evaluate response."}
-                error_msg["url"] = url
-                error_msg["error_code"] = 101
+                error_msg = {
+                    "error": "Could not evaluate response.",
+                    "url": url,
+                    "error_code": 101,
+                }
                 logger.error(f"No response: {json.dumps(error_msg)}.")
             else:
                 error_msg = {}
@@ -548,8 +540,9 @@ class XmrtoConnection:
                     f"No response: {json.dumps(error_msg)}. No response expected, ignored."
                 )
             return error_msg
-        elif isinstance(response_, dict) and (
-            not response_.get("error", None) is None
+        elif (
+            isinstance(response_, dict)
+            and response_.get("error", None) is not None
         ):
             error_msg = response_
             error_msg["url"] = url
@@ -628,10 +621,7 @@ class CreateOrder:
     @classmethod
     def get(cls, data, api):
 
-        xmrto_error = None
-        if data and "error" in data:
-            xmrto_error = data
-
+        xmrto_error = data if data and "error" in data else None
         order_ = cls.api_classes[api]
 
         if not order_ or data is None:
@@ -658,10 +648,7 @@ class OrderStatus:
     @classmethod
     def get(cls, data, api):
 
-        xmrto_error = None
-        if data and "error" in data:
-            xmrto_error = data
-
+        xmrto_error = data if data and "error" in data else None
         status_ = cls.api_classes[api]
 
         if not status_ or data is None:
@@ -709,10 +696,7 @@ class CheckPrice:
     @classmethod
     def get(cls, data, api):
 
-        xmrto_error = None
-        if data and "error" in data:
-            xmrto_error = data
-
+        xmrto_error = data if data and "error" in data else None
         price_ = cls.api_classes[api]
 
         if not price_ or data is None:
@@ -739,10 +723,7 @@ class CheckRoutes:
     @classmethod
     def get(cls, data, api):
 
-        xmrto_error = None
-        if data and "error" in data:
-            xmrto_error = data
-
+        xmrto_error = data if data and "error" in data else None
         routes_ = cls.api_classes[api]
 
         if not routes_ or data is None:
@@ -769,10 +750,7 @@ class CheckParameters:
     @classmethod
     def get(cls, data, api):
 
-        xmrto_error = None
-        if data and "error" in data:
-            xmrto_error = data
-
+        xmrto_error = data if data and "error" in data else None
         parameters_ = cls.api_classes[api]
 
         if not parameters_ or data is None:
@@ -872,10 +850,8 @@ class XmrtoApi:
         )
 
         postdata = {"btc_dest_address": out_address}
-        postdata.update(
-            self.__add_amount_and_currency(
-                out_amount=out_amount, currency=currency
-            )
+        postdata |= self.__add_amount_and_currency(
+            out_amount=out_amount, currency=currency
         )
 
         response = self.__xmr_conn.post(
@@ -946,10 +922,7 @@ class XmrtoApi:
             xmrto_error = response
             confirmed = False
 
-        if response is None:
-            return False, xmrto_error
-
-        return confirmed, xmrto_error
+        return (False, xmrto_error) if response is None else (confirmed, xmrto_error)
 
     def order_check_price(
         self, btc_amount=None, xmr_amount=None, currency="BTC"
@@ -972,10 +945,8 @@ class XmrtoApi:
             out_amount = xmr_amount
 
         postdata = {}
-        postdata.update(
-            self.__add_amount_and_currency(
-                out_amount=out_amount, currency=currency
-            )
+        postdata |= self.__add_amount_and_currency(
+            out_amount=out_amount, currency=currency
         )
 
         response = self.__xmr_conn.post(
@@ -1127,16 +1098,16 @@ class XmrtoOrderStatus:
         data = {}
 
         if self.uuid:
-            data.update({OrderAttributesV3.uuid: self.uuid})
+            data[OrderAttributesV3.uuid] = self.uuid
 
         if self.state:
-            data.update({OrderAttributesV3.state: self.state})
+            data[OrderAttributesV3.state] = self.state
 
         if self.out_address:
-            data.update({StatusAttributesV3.out_address: self.out_address})
+            data[StatusAttributesV3.out_address] = self.out_address
 
         if self.out_amount:
-            data.update({StatusAttributesV3.out_amount: self.out_amount})
+            data[StatusAttributesV3.out_amount] = self.out_amount
 
         if self.payment_subaddress:
             data[
@@ -1171,12 +1142,10 @@ class XmrtoOrderStatus:
             ] = self.in_confirmations_remaining
 
         if self.payments:
-            data.update({StatusAttributesV3.payments: self.payments})
+            data[StatusAttributesV3.payments] = self.payments
 
         if self.uses_lightning is not None:
-            data.update(
-                {StatusAttributesV3.uses_lightning: self.uses_lightning}
-            )
+            data[StatusAttributesV3.uses_lightning] = self.uses_lightning
 
         if self.error:
             data["error"] = self.error
@@ -1306,24 +1275,22 @@ class XmrtoOrder(metaclass=OrderStateType):
         data = {}
 
         if self.uuid:
-            data.update({OrderAttributesV3.uuid: self.uuid})
+            data[OrderAttributesV3.uuid] = self.uuid
 
         if self.state:
-            data.update({OrderAttributesV3.state: self.state})
+            data[OrderAttributesV3.state] = self.state
 
         if self.out_address:
-            data.update({OrderAttributesV3.out_address: self.out_address})
+            data[OrderAttributesV3.out_address] = self.out_address
 
         if self.out_amount:
-            data.update({OrderAttributesV3.out_amount: self.out_amount})
+            data[OrderAttributesV3.out_amount] = self.out_amount
 
         if self.uses_lightning is not None:
-            data.update(
-                {OrderAttributesV3.uses_lightning: self.uses_lightning}
-            )
+            data[OrderAttributesV3.uses_lightning] = self.uses_lightning
 
         if self.order_status:
-            data.update(self.order_status._to_json())
+            data |= self.order_status._to_json()
 
         if self.error:
             data.update(self.error)
@@ -1439,18 +1406,15 @@ def confirm_partial_payment(
         uuid=uuid,
         connection=connection,
     )
-    if not order_status.state == XmrtoOrder.UNDERPAID:
-        logger.warning(
-            f"The order is not ready for a partial payment, wrong state."
-        )
+    if order_status.state != XmrtoOrder.UNDERPAID:
+        logger.warning("The order is not ready for a partial payment, wrong state.")
         return order_status
     else:
-        partial_payment_confirmed = order_status.confirm_partial_payment()
-        if not partial_payment_confirmed:
-            logger.error("The partial payment was not confirmed.")
-        else:
+        if partial_payment_confirmed := order_status.confirm_partial_payment():
             logger.info("The partial payment was confirmed.")
 
+        else:
+            logger.error("The partial payment was not confirmed.")
     return order_status
 
 
@@ -1501,24 +1465,25 @@ def generate_qrcode(
 
 
 def follow_order(order: None, follow=False):
+    if not order:
+        return
     total = 1
-    if order:
-        while not order.state == XmrtoOrder.BTC_SENT and not order.error:
-            print(order)
-            if order.state in (XmrtoOrder.UNPAID, XmrtoOrder.UNDERPAID):
-                print("Pay:")
-                print(
-                    f"    transfer {order.order_status.payment_subaddress} {order.order_status.in_amount_remaining}"
-                )
-            if not follow:
-                return
-            if order.state == XmrtoOrder.TIMED_OUT:
-                total -= 1
-                if total == 0:
-                    break
-            time.sleep(3)
-            order.get_order_status()
+    while order.state != XmrtoOrder.BTC_SENT and not order.error:
         print(order)
+        if order.state in (XmrtoOrder.UNPAID, XmrtoOrder.UNDERPAID):
+            print("Pay:")
+            print(
+                f"    transfer {order.order_status.payment_subaddress} {order.order_status.in_amount_remaining}"
+            )
+        if not follow:
+            return
+        if order.state == XmrtoOrder.TIMED_OUT:
+            total -= 1
+            if total == 0:
+                break
+        time.sleep(3)
+        order.get_order_status()
+    print(order)
 
 
 def logo_action(text=""):
